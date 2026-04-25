@@ -29,6 +29,12 @@ jobs:
           rm -rf gen
           NDK_HOME=$NDK_HOME yes | ~/.cargo/bin/cargo-tauri android init
           
+          # SUNTIK MANIFEST SECARA PAKSA (CARA PALING AMPUH)
+          MANIFEST_FILE=$(find gen/android -name "AndroidManifest.xml")
+          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.CAMERA" />' $MANIFEST_FILE
+          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />' $MANIFEST_FILE
+          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />' $MANIFEST_FILE
+          
           # Optimasi Gradle
           find gen/android -name "build.gradle" -exec sed -i 's/minifyEnabled false/minifyEnabled true/g' {} +
           
