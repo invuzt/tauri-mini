@@ -16,8 +16,8 @@ serde_json = "1.0"
 tauri-build = "2.0.0"
 
 [profile.release]
-opt-level = "z"
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
+opt-level = "z"      # Optimasi ukuran paling agresif
+lto = true           # Link Time Optimization penuh
+codegen-units = 1    # Minimalisir paralelisme demi ukuran
+panic = "abort"      # Hapus mekanisme unwinding
+strip = true         # Hapus semua simbol debug

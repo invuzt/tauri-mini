@@ -1,63 +1,51 @@
-name: Build Final Ultra-Slim APK
-on:
-  push:
-    branches: [ rust, main ]
+name: Ultra Slim Build
+on: [push]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Java & Rust
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
-      
-      - name: Install Rust Target
-        run: rustup target add aarch64-linux-android
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
 
-      - name: Install Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: System Deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev mold
-
-      - name: Install Tauri CLI
+      - name: Install Tools
         run: |
           curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
           ~/.cargo/bin/cargo-binstall tauri-cli@2.0.3 -y
+          sudo apt-get update && sudo apt-get install -y upx-ucl
 
-      - name: Build APK
+      - name: Build & Shrink
         run: |
           export NDK_HOME=$(ls -d $ANDROID_HOME/ndk/* | head -1)
           cd src-tauri
           if [ ! -d "gen/android" ]; then
             NDK_HOME=$NDK_HOME yes | ~/.cargo/bin/cargo-tauri android init
           fi
+          
+          # Aktifkan Minify di Gradle secara paksa
+          sed -i 's/minifyEnabled false/minifyEnabled true/' gen/android/app/build.gradle
+          sed -i 's/shrinkResources false/shrinkResources true/' gen/android/app/build.gradle
+          
           NDK_HOME=$NDK_HOME ~/.cargo/bin/cargo-tauri android build --target aarch64
 
-      - name: Generate Dummy Keystore & Sign
+      - name: Manual Compression
         run: |
-          # 1. Buat Keystore Dummy
-          keytool -genkey -v -keystore release.keystore -alias vuzt_alias -keyalg RSA -keysize 2048 -validity 10000 -storepass vuztpass -keypass vuztpass -dname "CN=Vuzt, OU=AI, O=Vuzt, L=Jakarta, S=ID, C=ID"
+          # Cari file .so dan hajar pake UPX
+          find src-tauri/gen/android -name "*.so" -exec upx --ultra-brute {} \;
           
-          # 2. Cari APK Unsigned
+          # Generate key dan Sign (seperti sebelumnya)
+          keytool -genkey -v -keystore release.keystore -alias vuzt -keyalg RSA -keysize 2048 -validity 10000 -storepass vuztpass -keypass vuztpass -dname "CN=Vuzt"
           APK_PATH=$(find src-tauri/gen/android -name "*-release-unsigned.apk" | head -1)
-          
-          # 3. Tanda tangani
-          $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:vuztpass --out src-tauri/vuzt-ai-final.apk $APK_PATH
+          $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:vuztpass --out vuzt-slim.apk $APK_PATH
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      - name: Upload
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: vuzt-v${{ github.run_number }}
-          name: Vuzt AI Build v${{ github.run_number }}
-          files: src-tauri/vuzt-ai-final.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: vuzt-ultra-slim
+          path: vuzt-slim.apk
