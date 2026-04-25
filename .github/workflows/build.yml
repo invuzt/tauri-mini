@@ -18,13 +18,12 @@ jobs:
         with:
           targets: aarch64-linux-android, armv7-linux-androideabi
 
-      # Caching super agresif
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
 
-      - name: Install Android SDK
+      - name: Install Android SDK & NDK
         uses: android-actions/setup-android@v3
 
       - name: Install System Deps & Mold
@@ -32,23 +31,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev mold
 
-      - name: Install Tauri CLI (Fast Install)
+      - name: Install Tauri CLI
         run: |
-          # Pakai binstall supaya tidak perlu compile 700+ crate di runner
           curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
           cargo binstall tauri-cli@2.0.0 -y
 
-      - name: Build APK Release
+      - name: Build APK
         env:
-          # Pakai mold linker agar linking kilat
           RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+          # Ambil NDK dari path SDK yang disediakan runner
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk-bundle 
         run: |
-          # Automasi init dan build
-          yes | cargo tauri android init
-          cargo tauri android build --release
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tauri-release-apk
-          path: src-tauri/gen/android/app/build/outputs/apk/release/*.apk
+          # 1. Init (tanpa pipe yes jika sudah ada gen/android, tapi aman dipakai)
+          cargo tauri android init --accept-all-sdk-licenses || yes | cargo tauri android init
+          
+          # 2. Build (Tauri 2.0 menggunakan perintah ini untuk release)
+          cargo tauri android build
