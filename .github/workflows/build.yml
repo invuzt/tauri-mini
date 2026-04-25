@@ -23,10 +23,10 @@ jobs:
         with:
           workspaces: src-tauri -> target
 
-      - name: Install Android SDK & NDK
+      - name: Install Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install System Deps & Mold
+      - name: System Deps & Mold
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev mold
@@ -34,16 +34,23 @@ jobs:
       - name: Install Tauri CLI
         run: |
           curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-          cargo binstall tauri-cli@2.0.0 -y
+          cargo binstall tauri-cli -y
 
       - name: Build APK
         env:
           RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
-          # Ambil NDK dari path SDK yang disediakan runner
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk-bundle 
         run: |
-          # 1. Init (tanpa pipe yes jika sudah ada gen/android, tapi aman dipakai)
-          cargo tauri android init --accept-all-sdk-licenses || yes | cargo tauri android init
+          # Buat folder gen/android manual supaya Tauri tidak bingung
+          mkdir -p src-tauri/gen/android
           
-          # 2. Build (Tauri 2.0 menggunakan perintah ini untuk release)
+          # Jalankan init tanpa flag aneh, pakai yes untuk lisensi
+          yes | cargo tauri android init
+          
+          # Jalankan build
           cargo tauri android build
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-release-apk
+          path: src-tauri/gen/android/app/build/outputs/apk/release/*.apk
