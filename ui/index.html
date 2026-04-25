@@ -3,45 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Vuzt Camera</title>
+    <title>Vuzt Capture</title>
     <style>
         body { margin: 0; padding: 20px; background: #121212; color: #eee; font-family: sans-serif; text-align: center; }
-        #video-preview { width: 100%; max-width: 400px; border-radius: 15px; background: #000; border: 2px solid #007bff; transform: scaleX(-1); }
-        .controls { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
-        button { padding: 12px 20px; border-radius: 8px; border: none; background: #007bff; color: white; font-weight: bold; }
-        .stop-btn { background: #b00020; }
+        #video-preview { width: 100%; border-radius: 15px; background: #000; border: 2px solid #007bff; }
+        .controls { margin-top: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        button { padding: 15px; border-radius: 8px; border: none; background: #007bff; color: white; font-weight: bold; }
+        .capture-btn { background: #28a745; grid-column: span 2; }
+        #status { margin-top: 15px; font-size: 12px; color: #888; }
+        canvas { display: none; }
     </style>
 </head>
 <body>
-    <h3>Vuzt Camera Preview</h3>
+    <h3>Vuzt Camera Saver</h3>
     <video id="video-preview" autoplay playsinline></video>
+    <canvas id="capture-canvas"></canvas>
     
+    <div id="status">Siap menjepret...</div>
+
     <div class="controls">
         <button onclick="startCamera()">Buka Kamera</button>
-        <button class="stop-btn" onclick="stopCamera()">Tutup</button>
+        <button style="background:#b00020" onclick="stopCamera()">Stop</button>
+        <button class="capture-btn" onclick="takePhoto()">JEPRET & SIMPAN</button>
     </div>
 
     <script>
+        const { invoke } = window.__TAURI__.core;
         let stream = null;
 
         async function startCamera() {
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user" }, // "user" untuk depan, "environment" untuk belakang
-                    audio: false 
-                });
-                const video = document.getElementById('video-preview');
-                video.srcObject = stream;
-            } catch (err) {
-                alert("Gagal akses kamera: " + err);
-            }
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+                document.getElementById('video-preview').srcObject = stream;
+            } catch (err) { alert("Akses ditolak: " + err); }
+        }
+
+        async function takePhoto() {
+            const video = document.getElementById('video-preview');
+            const canvas = document.getElementById('capture-canvas');
+            const status = document.getElementById('status');
+
+            if (!stream) return alert("Buka kamera dulu!");
+
+            // 1. Gambar frame video ke canvas
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+
+            // 2. Ubah jadi Base64 JPEG
+            const base64Data = canvas.toDataURL('image/jpeg', 0.9);
+            
+            // 3. Kirim ke Rust untuk disimpan
+            status.innerText = "Mengirim ke Rust...";
+            const result = await invoke('save_photo', { base64Data });
+            status.innerText = result;
         }
 
         function stopCamera() {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                document.getElementById('video-preview').srcObject = null;
-            }
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            document.getElementById('video-preview').srcObject = null;
         }
     </script>
 </body>

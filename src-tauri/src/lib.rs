@@ -1,76 +1,33 @@
-use tauri::State;
-use std::sync::Mutex;
+use tauri::command;
 use std::fs;
-use std::path::Path;
-use serde::{Serialize, Deserialize};
+use base64::{engine::general_purpose, Engine as _};
 
-#[derive(Serialize, Deserialize, Clone)]
-struct Item {
-    id: i32,
-    name: String,
-}
-
-struct AppData(Mutex<Vec<Item>>);
-
-const FILE_PATH: &str = "/sdcard/Download/vuzt_data.md";
-
-fn save_to_file(items: &Vec<Item>) {
-    let mut content = String::from("# Vuzt AI Data Storage\n\n");
-    for item in items {
-        content.push_str(&format!("- [ID: {}] {}\n", item.id, item.name));
+#[command]
+fn save_photo(base64_data: String) -> String {
+    // 1. Bersihkan prefix base64 (data:image/jpeg;base64,...)
+    let clean_data = base64_data.split(',').last().unwrap_or("");
+    
+    // 2. Decode string ke binary
+    let bytes = general_purpose::STANDARD.decode(clean_data).unwrap();
+    
+    // 3. Tentukan nama file unik (pake timestamp)
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let file_path = format!("/sdcard/Download/Vuzt_{}.jpg", timestamp);
+    
+    // 4. Tulis ke storage
+    match fs::write(&file_path, bytes) {
+        Ok(_) => format!("Foto tersimpan di: {}", file_path),
+        Err(e) => format!("Gagal simpan: {}", e),
     }
-    let _ = fs::write(FILE_PATH, content);
-}
-
-fn load_from_file() -> Vec<Item> {
-    if !Path::new(FILE_PATH).exists() {
-        return Vec::new();
-    }
-    let content = fs::read_to_string(FILE_PATH).unwrap_or_default();
-    let mut items = Vec::new();
-    for line in content.lines() {
-        if line.starts_with("- [ID: ") {
-            let parts: Vec<&str> = line.split("] ").collect();
-            if parts.len() == 2 {
-                let id_part = parts[0].replace("- [ID: ", "");
-                if let Ok(id) = id_part.parse::<i32>() {
-                    items.push(Item { id, name: parts[1].to_string() });
-                }
-            }
-        }
-    }
-    items
-}
-
-#[tauri::command]
-fn create_item(state: State<AppData>, name: String) -> Vec<Item> {
-    let mut db = state.0.lock().unwrap();
-    let new_id = db.last().map(|i| i.id + 1).unwrap_or(1);
-    db.push(Item { id: new_id, name });
-    save_to_file(&db);
-    db.clone()
-}
-
-#[tauri::command]
-fn read_items(state: State<AppData>) -> Vec<Item> {
-    let mut db = state.0.lock().unwrap();
-    *db = load_from_file();
-    db.clone()
-}
-
-#[tauri::command]
-fn delete_item(state: State<AppData>, id: i32) -> Vec<Item> {
-    let mut db = state.0.lock().unwrap();
-    db.retain(|i| i.id != id);
-    save_to_file(&db);
-    db.clone()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .manage(AppData(Mutex::new(load_from_file())))
-        .invoke_handler(tauri::generate_handler![create_item, read_items, delete_item])
+        .invoke_handler(tauri::generate_handler![save_photo])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
