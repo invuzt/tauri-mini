@@ -1,7 +1,7 @@
 {
   "productName": "TauriMini",
   "version": "0.1.0",
-  "identifier": "com.mini.turbo",
+  "identifier": "com.vuzt.app",
   "build": {
     "frontendDist": "../ui"
   },

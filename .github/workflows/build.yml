@@ -27,19 +27,26 @@ jobs:
           export NDK_HOME=$(ls -d $ANDROID_HOME/ndk/* | head -1)
           cd src-tauri
           
-          # 1. Init dulu sampai selesai
+          # Hapus gen untuk memastikan init ulang dengan identifier terbaru
+          rm -rf gen
+          
+          # 1. Init ulang secara total
           NDK_HOME=$NDK_HOME yes | ~/.cargo/bin/cargo-tauri android init
           
-          # 2. SEKARANG baru bedah filenya karena folder gen pasti sudah ada
-          sed -i 's/minifyEnabled false/minifyEnabled true/' gen/android/app/build.gradle
-          sed -i 's/shrinkResources false/shrinkResources true/' gen/android/app/build.gradle
+          # 2. Bedah gradle (Minify & Shrink)
+          # Kita pakai 'find' supaya sed tidak salah alamat folder
+          find gen/android -name "build.gradle" -exec sed -i 's/minifyEnabled false/minifyEnabled true/g' {} +
+          find gen/android -name "build.gradle" -exec sed -i 's/shrinkResources false/shrinkResources true/g' {} +
           
-          # 3. Build
+          # 3. Build dengan flag --no-run untuk memastikan kompilasi saja
           NDK_HOME=$NDK_HOME ~/.cargo/bin/cargo-tauri android build --target aarch64
 
       - name: Manual Compression & Sign
         run: |
+          # Cari semua file .so di dalam output dan hajar dengan UPX
           find src-tauri/gen/android -name "*.so" -exec upx --ultra-brute {} \;
+          
+          # Sign APK
           keytool -genkey -v -keystore release.keystore -alias vuzt -keyalg RSA -keysize 2048 -validity 10000 -storepass vuztpass -keypass vuztpass -dname "CN=Vuzt"
           APK_PATH=$(find src-tauri/gen/android -name "*-release-unsigned.apk" | head -1)
           $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:vuztpass --out vuzt-slim.apk $APK_PATH
