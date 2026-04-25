@@ -2,49 +2,37 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Vuzt AI CRUD</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vuzt Proof of Rust</title>
     <style>
-        body { 
-            margin: 0; padding: 20px; background: #121212; color: #e0e0e0; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            overflow-x: hidden; touch-action: pan-y;
+        body { margin: 0; padding: 20px; background: #121212; color: #e0e0e0; font-family: sans-serif; }
+        .log-box { 
+            background: #000; color: #00ff00; padding: 10px; font-family: monospace; 
+            font-size: 11px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #333;
         }
-        .header { margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        .input-group { display: flex; gap: 10px; margin-bottom: 20px; }
-        input { 
-            flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #444; 
-            background: #1e1e1e; color: white; outline: none;
-        }
-        button { 
-            padding: 10px 20px; border-radius: 8px; border: none; 
-            background: #007bff; color: white; font-weight: bold; transition: 0.2s;
-        }
-        button:active { transform: scale(0.95); }
-        .item { 
-            background: #1e1e1e; padding: 15px; margin-top: 10px; border-radius: 10px; 
-            display: flex; justify-content: space-between; align-items: center;
-            border-left: 4px solid #007bff;
-        }
-        .del-btn { background: #b00020; padding: 8px 12px; font-size: 12px; }
+        input { padding: 10px; width: 60%; border-radius: 5px; border: 1px solid #444; background: #1e1e1e; color: white; }
+        button { padding: 10px; border-radius: 5px; border: none; background: #007bff; color: white; }
+        .item { background: #1e1e1e; padding: 10px; margin-top: 10px; border-radius: 5px; display: flex; justify-content: space-between; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h2>Vuzt Rust Core</h2>
-        <small style="color: #888;">Simple CRUD via Rust State</small>
-    </div>
+    <div id="rustInfo" class="log-box">Menunggu data dari Rust...</div>
 
-    <div class="input-group">
-        <input type="text" id="inputName" placeholder="Masukkan nama...">
+    <div style="display:flex; gap:10px;">
+        <input type="text" id="inputName" placeholder="Tambah data...">
         <button onclick="addItem()">ADD</button>
     </div>
 
     <div id="list"></div>
 
     <script>
-        // Menggunakan core API dari Tauri 2.0
         const { invoke } = window.__TAURI__.core;
+
+        async function updateRustInfo() {
+            // Meminta info spesifik dari sistem Rust
+            const info = await invoke('get_rust_info');
+            document.getElementById('rustInfo').innerText = "> " + info;
+        }
 
         async function render(items) {
             const listDiv = document.getElementById('list');
@@ -53,28 +41,25 @@
                 listDiv.innerHTML += `
                     <div class="item">
                         <span>${item.name}</span>
-                        <button class="del-btn" onclick="deleteItem(${item.id})">HAPUS</button>
+                        <button style="background:#b00020" onclick="deleteItem(${item.id})">DEL</button>
                     </div>`;
             });
         }
 
         async function addItem() {
             const input = document.getElementById('inputName');
-            if (!input.value) return;
-            // Memanggil fungsi Rust 'create_item'
             const items = await invoke('create_item', { name: input.value });
             input.value = '';
             render(items);
         }
 
         async function deleteItem(id) {
-            // Memanggil fungsi Rust 'delete_item'
             const items = await invoke('delete_item', { id });
             render(items);
         }
 
-        // Ambil data saat aplikasi terbuka
         window.onload = async () => {
+            updateRustInfo();
             const items = await invoke('read_items');
             render(items);
         }
