@@ -24,37 +24,33 @@ jobs:
 
       - name: Build & Shrink
         run: |
-          export NDK_HOME=$(ls -d $ANDROID_HOME/ndk/* | head -1)
+          export NDK_HOME=\$(ls -d \$ANDROID_HOME/ndk/* | head -1)
           cd src-tauri
-          
-          # Hapus gen untuk memastikan init ulang dengan identifier terbaru
           rm -rf gen
+          NDK_HOME=\$NDK_HOME yes | ~/.cargo/bin/cargo-tauri android init
           
-          # 1. Init ulang secara total
-          NDK_HOME=$NDK_HOME yes | ~/.cargo/bin/cargo-tauri android init
+          # --- INJEKSI IZIN KAMERA DI SINI ---
+          MANIFEST_FILE=\$(find gen/android -name "AndroidManifest.xml")
+          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.CAMERA" />' \$MANIFEST_FILE
+          sed -i '/<manifest/a \    <uses-feature android:name="android.hardware.camera" android:required="false" />' \$MANIFEST_FILE
           
-          # 2. Bedah gradle (Minify & Shrink)
-          # Kita pakai 'find' supaya sed tidak salah alamat folder
+          # Aktifkan Minify & Shrink
           find gen/android -name "build.gradle" -exec sed -i 's/minifyEnabled false/minifyEnabled true/g' {} +
-          find gen/android -name "build.gradle" -exec sed -i 's/shrinkResources false/shrinkResources true/g' {} +
+          find gen/android -name "shrinkResources false/shrinkResources true/g" {} +
           
-          # 3. Build dengan flag --no-run untuk memastikan kompilasi saja
-          NDK_HOME=$NDK_HOME ~/.cargo/bin/cargo-tauri android build --target aarch64
+          NDK_HOME=\$NDK_HOME ~/.cargo/bin/cargo-tauri android build --target aarch64
 
       - name: Manual Compression & Sign
         run: |
-          # Cari semua file .so di dalam output dan hajar dengan UPX
           find src-tauri/gen/android -name "*.so" -exec upx --ultra-brute {} \;
-          
-          # Sign APK
           keytool -genkey -v -keystore release.keystore -alias vuzt -keyalg RSA -keysize 2048 -validity 10000 -storepass vuztpass -keypass vuztpass -dname "CN=Vuzt"
-          APK_PATH=$(find src-tauri/gen/android -name "*-release-unsigned.apk" | head -1)
-          $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:vuztpass --out vuzt-slim.apk $APK_PATH
+          APK_PATH=\$(find src-tauri/gen/android -name "*-release-unsigned.apk" | head -1)
+          \$ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:vuztpass --out vuzt-camera.apk \$APK_PATH
 
       - name: Upload Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: vuzt-v${{ github.run_number }}
-          files: vuzt-slim.apk
+          tag_name: vuzt-v\${{ github.run_number }}
+          files: vuzt-camera.apk
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
