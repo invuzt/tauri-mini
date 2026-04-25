@@ -1,4 +1,4 @@
-name: Android Ultra Fast Build
+name: Android Slim Build
 on: [push]
 
 jobs:
@@ -12,18 +12,17 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
-          # Kita matikan cache otomatis di sini karena folder Gradle belum ada di awal
-          
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android, armv7-linux-androideabi
+          # Hanya target 64-bit untuk HP modern agar size APK kecil
+          targets: aarch64-linux-android
 
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
-          shared-key: "tauri-android-cache"
 
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
@@ -38,21 +37,21 @@ jobs:
           curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
           cargo binstall tauri-cli -y
 
-      - name: Build APK
+      - name: Build Slim APK
         env:
-          RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+          RUSTFLAGS: "-C link-arg=-fuse-ld=mold -C target-feature=+crt-static"
         run: |
           cd src-tauri
-          # Pastikan folder gen/android ada sebelum build agar Gradle bisa jalan
           if [ ! -d "gen/android" ]; then
             yes | cargo tauri android init
           fi
-          cargo tauri android build
-
+          
+          # Build hanya untuk 1 arsitektur (Slim Mode) 
+          # Menggunakan --debug agar ditandatangani dummy key secara otomatis
+          cargo tauri android build --debug --target aarch64
+          
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-mini-apk
-          path: |
-            src-tauri/gen/android/**/*.apk
-          if-no-files-found: error
+          name: tauri-slim-debug-apk
+          path: src-tauri/gen/android/app/build/outputs/apk/debug/*.apk
