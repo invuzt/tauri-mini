@@ -18,31 +18,37 @@ jobs:
         with:
           targets: aarch64-linux-android, armv7-linux-androideabi
 
-      - name: Cache Rust
+      # Caching super agresif
+      - name: Rust Cache
         uses: swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: src-tauri -> target
 
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: System Dependencies
+      - name: Install System Deps & Mold
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev mold
 
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2.0.0"
-
-      - name: Initialize and Build APK
+      - name: Install Tauri CLI (Fast Install)
         run: |
-          # Karena kita tidak init di lokal, kita paksa init di sini
-          # --accept-all-sdk-licenses memastikan tidak ada prompt interaktif
-          cargo tauri android init --accept-all-sdk-licenses
+          # Pakai binstall supaya tidak perlu compile 700+ crate di runner
+          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+          cargo binstall tauri-cli@2.0.0 -y
+
+      - name: Build APK Release
+        env:
+          # Pakai mold linker agar linking kilat
+          RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
+        run: |
+          # Automasi init dan build
+          yes | cargo tauri android init
           cargo tauri android build --release
 
-      - name: Upload APK
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-mini-apk
+          name: tauri-release-apk
           path: src-tauri/gen/android/app/build/outputs/apk/release/*.apk
