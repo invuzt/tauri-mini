@@ -6,42 +6,48 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android, armv7-linux-androideabi
+
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
+
       - name: System Deps & Mold
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev mold
+
       - name: Install Tauri CLI
         run: |
           curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
           cargo binstall tauri-cli -y
+
       - name: Build APK
         env:
           RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
         run: |
-          # Hapus sisa-sisa kegagalan sebelumnya agar bersih
-          rm -rf src-tauri/gen/android
-          
-          # Jalankan init secara otomatis
-          # Tauri 2.0 CLI akan membuat folder com/mini/app secara otomatis
+          cd src-tauri
+          # Hapus folder lama agar init bersih
+          rm -rf gen/android
+          # Jalankan init
           yes | cargo tauri android init
-          
-          # Jalankan build release
+          # Build APK Release
           cargo tauri android build
+          
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:

@@ -8,11 +8,16 @@ name = "tauri_mini_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
-tauri = { version = "2.0.0", features = ["android"] }
+tauri = { version = "2.1.1", features = [] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 [build-dependencies]
-tauri-build = { version = "2.0.0", features = [] }
+tauri-build = "2.0.3"
 
-[workspace]
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
