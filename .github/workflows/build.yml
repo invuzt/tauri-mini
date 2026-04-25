@@ -19,24 +19,20 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev mold
 
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --version 2.1.1
+        run: |
+          # Gunakan cara paling aman: download binary langsung
+          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+          # Nama paket yang benar di registry adalah tauri-cli
+          ~/.cargo/bin/cargo-binstall tauri-cli@2.0.3 -y
 
       - name: Build Actual Release
         run: |
           cd src-tauri
-          yes | cargo tauri android init
-          # Pakai release agar size kecil, tapi tambahkan signing manual nanti
-          cargo tauri android build --target aarch64
+          yes | ~/.cargo/bin/cargo-tauri android init
+          ~/.cargo/bin/cargo-tauri android build --target aarch64
           
-      - name: Sign APK (Dummy Signer)
-        run: |
-          # Menggunakan debug key bawaan SDK untuk tanda tangani APK Release
-          # Ini trik agar APK Release yang kecil bisa diinstal seperti APK Debug
-          find src-tauri/gen/android -name "*-release-unsigned.apk" -exec mv {} src-tauri/final.apk \;
-          $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks-pass pass:android --ks $ANDROID_HOME/build-tools/34.0.0/debug.keystore src-tauri/final.apk
-
-      - name: Upload
+      - name: Upload Unsigned APK (Untuk Cek Size)
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-super-slim
-          path: src-tauri/final.apk
+          name: tauri-final-result
+          path: src-tauri/gen/android/app/build/outputs/apk/release/*.apk
