@@ -15,6 +15,9 @@ jobs:
           targets: aarch64-linux-android
       - uses: swatinem/rust-cache@v2
 
+      - name: Install Android SDK & NDK
+        uses: android-actions/setup-android@v3
+
       - name: Install System Deps
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev mold
 
@@ -24,15 +27,24 @@ jobs:
           ~/.cargo/bin/cargo-binstall tauri-cli@2.0.3 -y
 
       - name: Build Actual Release
+        env:
+          # Paksa NDK Home agar init tidak komplain
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk-bundle
         run: |
           cd src-tauri
-          # Hapus folder lama agar tidak konflik
           rm -rf gen/android
+          
+          # Jalankan init
           yes | ~/.cargo/bin/cargo-tauri android init
+          
+          # Kadang generator menaruh project di folder yang dalam, kita paksa build mencari path-nya
+          # Jika folder gen/android ada, kita hajar build
           ~/.cargo/bin/cargo-tauri android build --target aarch64
           
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: tauri-final-fixed
-          path: src-tauri/gen/android/app/build/outputs/apk/release/*.apk
+          path: |
+             src-tauri/gen/android/**/*.apk
+             src-tauri/gen/android/app/build/outputs/apk/release/*.apk
