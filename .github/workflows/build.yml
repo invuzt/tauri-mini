@@ -1,4 +1,4 @@
-name: Final Slim Release
+name: Final Fix Build
 on: [push]
 
 jobs:
@@ -20,19 +20,19 @@ jobs:
 
       - name: Install Tauri CLI
         run: |
-          # Gunakan cara paling aman: download binary langsung
           curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-          # Nama paket yang benar di registry adalah tauri-cli
           ~/.cargo/bin/cargo-binstall tauri-cli@2.0.3 -y
 
       - name: Build Actual Release
         run: |
           cd src-tauri
+          # Hapus folder lama agar tidak konflik
+          rm -rf gen/android
           yes | ~/.cargo/bin/cargo-tauri android init
           ~/.cargo/bin/cargo-tauri android build --target aarch64
           
-      - name: Upload Unsigned APK (Untuk Cek Size)
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: tauri-final-result
+          name: tauri-final-fixed
           path: src-tauri/gen/android/app/build/outputs/apk/release/*.apk
