@@ -27,19 +27,19 @@ jobs:
           ~/.cargo/bin/cargo-binstall tauri-cli@2.0.3 -y
 
       - name: Build Actual Release
-        env:
-          # Paksa NDK Home agar init tidak komplain
-          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk-bundle
         run: |
+          # Cari path NDK asli di runner
+          export NDK_HOME=$(ls -d $ANDROID_HOME/ndk/* | head -1)
+          echo "Using NDK at $NDK_HOME"
+          
           cd src-tauri
           rm -rf gen/android
           
-          # Jalankan init
-          yes | ~/.cargo/bin/cargo-tauri android init
+          # Jalankan init dengan NDK_HOME yang valid
+          NDK_HOME=$NDK_HOME yes | ~/.cargo/bin/cargo-tauri android init
           
-          # Kadang generator menaruh project di folder yang dalam, kita paksa build mencari path-nya
-          # Jika folder gen/android ada, kita hajar build
-          ~/.cargo/bin/cargo-tauri android build --target aarch64
+          # Build
+          NDK_HOME=$NDK_HOME ~/.cargo/bin/cargo-tauri android build --target aarch64
           
       - name: Upload
         uses: actions/upload-artifact@v4
@@ -47,4 +47,3 @@ jobs:
           name: tauri-final-fixed
           path: |
              src-tauri/gen/android/**/*.apk
-             src-tauri/gen/android/app/build/outputs/apk/release/*.apk
