@@ -1,4 +1,4 @@
-name: Android Turbo Build
+name: Android Ultra Fast Build
 on: [push]
 
 jobs:
@@ -12,16 +12,21 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: '17'
+          # Cache Gradle otomatis
+          cache: 'gradle'
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android, armv7-linux-androideabi
 
+      # Cache Rust Crates & Incremental Compilation
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+          # Shared cache agar antar branch bisa saling pakai
+          shared-key: "tauri-android-cache"
 
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
@@ -33,6 +38,7 @@ jobs:
 
       - name: Install Tauri CLI
         run: |
+          # Pakai binstall agar install CLI cuma 5 detik
           curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
           cargo binstall tauri-cli -y
 
@@ -41,15 +47,18 @@ jobs:
           RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
         run: |
           cd src-tauri
-          # Hapus folder lama agar init bersih
-          rm -rf gen/android
-          # Jalankan init
-          yes | cargo tauri android init
-          # Build APK Release
+          # Hanya hapus gen/android jika tidak ada, agar Gradle cache bekerja
+          if [ ! -d "gen/android" ]; then
+            yes | cargo tauri android init
+          fi
           cargo tauri android build
-          
-      - name: Upload Artifact
+
+      - name: Upload Artifact (Auto-Hunt)
         uses: actions/upload-artifact@v4
         with:
           name: tauri-mini-apk
-          path: src-tauri/gen/android/app/build/outputs/apk/release/*.apk
+          # Mencari di semua folder gen dan target
+          path: |
+            src-tauri/gen/android/**/*.apk
+            src-tauri/target/**/*.apk
+          if-no-files-found: error
