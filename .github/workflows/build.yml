@@ -1,5 +1,5 @@
-name: Android Build
-on: [push, pull_request]
+name: Android Turbo Build
+on: [push]
 
 jobs:
   build:
@@ -16,25 +16,33 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android, armv7-linux-androideabi, i686-linux-android, x86_64-linux-android
+          targets: aarch64-linux-android, armv7-linux-androideabi
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
 
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install dependencies
+      - name: System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --version 2.0.0-rc
+        run: cargo install tauri-cli --version "^2.0.0"
 
-      - name: Build APK
-        run: cargo tauri android build --no-bundle
-        # --no-bundle digunakan jika kamu hanya ingin APK mentah tanpa bundling tambahan
+      - name: Initialize and Build APK
+        run: |
+          # Karena kita tidak init di lokal, kita paksa init di sini
+          # --accept-all-sdk-licenses memastikan tidak ada prompt interaktif
+          cargo tauri android init --accept-all-sdk-licenses
+          cargo tauri android build --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
+          name: tauri-mini-apk
           path: src-tauri/gen/android/app/build/outputs/apk/release/*.apk
